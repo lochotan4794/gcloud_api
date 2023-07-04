@@ -6,6 +6,8 @@ from pydantic import BaseModel, validator, Extra, ValidationError
 import numpy as np
 import os
 from flask import redirect, url_for
+from flask_cors import CORS, cross_origin
+
 
 from utils.utils import generic_api_requests
 
@@ -59,7 +61,6 @@ def create_activity():
         }
 
         return jsonify(response_body), 400
-
 
 @activities.route("/predict", methods=["POST", "GET"], strict_slashes=False)
 def lasso_predict():

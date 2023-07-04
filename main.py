@@ -8,12 +8,12 @@ from flask_cors import CORS, cross_origin
 
 from blueprints.activities import activities
 
-
 def create_app():
   app = Flask(__name__, static_url_path='/static')
   app.register_blueprint(activities, url_prefix="/api")
-  cors = CORS(app)
   app.config['CORS_HEADERS'] = 'Content-Type'
+
+  CORS(app, resources={r"/api/*": {"origins": "*"}})
 
   # Error 404 handler
   @app.errorhandler(404)
