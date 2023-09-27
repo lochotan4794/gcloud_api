@@ -1,5 +1,10 @@
 import config
 import json
+import sys
+import io
+
+# setting path
+sys.path.append('../')
 
 from flask import Blueprint, jsonify, request, g
 from pydantic import BaseModel, validator, Extra, ValidationError
@@ -7,13 +12,27 @@ import numpy as np
 import os
 from flask import redirect, url_for
 from flask_cors import CORS, cross_origin
+from runObjectness import run_objectness
+import cv2
+from defaultParams import default_params
+from drawBoxes import draw_boxes, save_boxes
+from computeObjectnessHeatMap import compute_objectness_heat_map
+import time
+from PIL import Image
+from flask import Response
+
 
 
 from utils.utils import generic_api_requests
 
 activities = Blueprint(name="activities", import_name=__name__)
 
-
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+    
 class ActivityCreationFilterInput(BaseModel, extra=Extra.forbid):
     name: str
 
@@ -77,3 +96,48 @@ def lasso_predict():
 @activities.route("/fun/", methods=["POST", "GET"], strict_slashes=False)
 def fun():
     return "123"
+
+
+@activities.route("/objectness", methods=["POST", "GET"], strict_slashes=False)
+def objectness():
+    image = request.files["image"].read()      
+    print(type(image))             
+    if image:
+        image  = io.BytesIO(image)
+        image = np.array(Image.open(image))
+        img_example = image[:, :, ::-1]
+        params = default_params('.')
+        # params.cues = ['SS']
+        boxes = run_objectness(img_example, 10, params)
+        return json.dumps({'boxes': boxes}, cls=NumpyEncoder)
+    return jsonify(image_pth="", safe=False)
+
+
+@activities.route("/ectract_feature", methods=["POST", "GET"], strict_slashes=False)
+def objectness():
+    image = request.files["image"].read()      
+    print(type(image))             
+    if image:
+        image  = io.BytesIO(image)
+        image = np.array(Image.open(image))
+        img_example = image[:, :, ::-1]
+        params = default_params('.')
+        # params.cues = ['SS']
+        boxes = run_objectness(img_example, 10, params)
+        return json.dumps({'boxes': boxes}, cls=NumpyEncoder)
+    return jsonify(image_pth="", safe=False)
+
+
+@activities.route("/optimize", methods=["POST", "GET"], strict_slashes=False)
+def objectness():
+    image = request.files["image"].read()      
+    print(type(image))             
+    if image:
+        image  = io.BytesIO(image)
+        image = np.array(Image.open(image))
+        img_example = image[:, :, ::-1]
+        params = default_params('.')
+        # params.cues = ['SS']
+        boxes = run_objectness(img_example, 10, params)
+        return json.dumps({'boxes': boxes}, cls=NumpyEncoder)
+    return jsonify(image_pth="", safe=False)
