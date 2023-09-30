@@ -2,10 +2,8 @@ import config
 import json
 import sys
 import io
-
 # setting path
 sys.path.append('../')
-
 from flask import Blueprint, jsonify, request, g
 from pydantic import BaseModel, validator, Extra, ValidationError
 import numpy as np
@@ -20,7 +18,8 @@ from computeObjectnessHeatMap import compute_objectness_heat_map
 import time
 from PIL import Image
 from flask import Response
-
+from computeFunction import *
+from PCG import *
 
 
 from utils.utils import generic_api_requests
@@ -101,43 +100,65 @@ def fun():
 @activities.route("/objectness", methods=["POST", "GET"], strict_slashes=False)
 def objectness():
     image = request.files["image"].read()      
-    print(type(image))             
     if image:
         image  = io.BytesIO(image)
         image = np.array(Image.open(image))
         img_example = image[:, :, ::-1]
         params = default_params('.')
-        # params.cues = ['SS']
         boxes = run_objectness(img_example, 10, params)
         return json.dumps({'boxes': boxes}, cls=NumpyEncoder)
     return jsonify(image_pth="", safe=False)
 
 
 @activities.route("/ectract_feature", methods=["POST", "GET"], strict_slashes=False)
-def objectness():
-    image = request.files["image"].read()      
-    print(type(image))             
-    if image:
-        image  = io.BytesIO(image)
-        image = np.array(Image.open(image))
-        img_example = image[:, :, ::-1]
-        params = default_params('.')
-        # params.cues = ['SS']
-        boxes = run_objectness(img_example, 10, params)
-        return json.dumps({'boxes': boxes}, cls=NumpyEncoder)
-    return jsonify(image_pth="", safe=False)
+def ectract_feature():
+    boxes = request.files["image"].read()      
+    train_data = [cv2.imread(img, cv2.COLOR_BGR2RGB) for img in boxes]
+    x_train = computeSIFT(train_data)
+    all_train_desc = []
+    for i in range(len(x_train)):
+        for j in range(x_train[i].shape[0]):
+            all_train_desc.append(x_train[i][j,:])
+    all_train_desc = np.array(all_train_desc)
+    k = 10
+    Level = 2
+    kmeans = clusterFeatures(all_train_desc, k)
+    train_histo = getHistogramSPM(Level, train_data, kmeans, k)
+    X = train_histo
+    similarity_matrix = np.corrcoef(X)
+    box_prior = box_prior(train_data)
+    L = normalize_laplacian(similarity_matrix)
+    nb = len(x_train)
+    k = 2
+    vector_one = np.ones(shape=(nb,1))
+    dim = X.shape[1]
+    I = np.identity(nb)
+    central_matrix = I - (1/nb) * np.dot(vector_one, vector_one.T)
+    mu = 0.5
+    lamda = 0.1
+    b = np.ones(shape=(nb, nb))
+    Identity = np.identity(dim)
+    A = discriminative_optimial(central_matrix, X, nb, Identity, k)
+    A = L + mu*A
+    b = lamda * np.log(box_prior)
+    return jsonify({'A': A, 'b': b}, safe=False)
 
 
 @activities.route("/optimize", methods=["POST", "GET"], strict_slashes=False)
-def objectness():
-    image = request.files["image"].read()      
-    print(type(image))             
-    if image:
-        image  = io.BytesIO(image)
-        image = np.array(Image.open(image))
-        img_example = image[:, :, ::-1]
-        params = default_params('.')
-        # params.cues = ['SS']
-        boxes = run_objectness(img_example, 10, params)
-        return json.dumps({'boxes': boxes}, cls=NumpyEncoder)
-    return jsonify(image_pth="", safe=False)
+def optimize():
+    annots = request.files["annots"].read()      
+    A = annots['A']
+    b = annots['b']
+    var_index = annots['var_index']
+    edge_index = annots['edge_index']
+  
+    x_0, S_0, alpha_0, ids = init_images(var_index)
+
+    opts.Tmax  = 2000 # max number of iteration
+    opts.TOL   = 1e-8 # tolerance for convergence
+    opts.verbose = True
+
+    opts.pureFW = 0
+    x_t,f_t, resPairFW = PFW(x_0, S_0, alpha_0, A, b, solver_images, cost_fun, ids, opts)
+
+    return jsonify({'x_t': x_t}, safe=False)
