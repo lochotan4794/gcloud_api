@@ -1,28 +1,30 @@
-import config
-import json
-import sys
-import io
 # setting path
 sys.path.append('../')
 from flask import Blueprint, jsonify, request, g
 from pydantic import BaseModel, validator, Extra, ValidationError
 import numpy as np
-import os
-from flask import redirect, url_for
-from flask_cors import CORS, cross_origin
+# import os
+# from flask import redirect, url_for
+# from flask_cors import CORS, cross_origin
 from runObjectness import run_objectness
 import cv2
 from defaultParams import default_params
-from drawBoxes import draw_boxes, save_boxes
-from computeObjectnessHeatMap import compute_objectness_heat_map
-import time
+# from drawBoxes import draw_boxes, save_boxes
+# from computeObjectnessHeatMap import compute_objectness_heat_map
+# import time
 from PIL import Image
-from flask import Response
+import config
+import json
+import sys
+import io
+# from flask import Response
 from computeFunction import *
 from PCG import *
-
-
 from utils.utils import generic_api_requests
+
+# Create two constant. They direct to the app root folder and logo upload folder
+APP_ROOT = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(APP_ROOT, 'static', 'images')
 
 activities = Blueprint(name="activities", import_name=__name__)
 
@@ -99,29 +101,39 @@ def fun():
 
 @activities.route("/objectness", methods=["POST", "GET"], strict_slashes=False)
 def objectness():
-    image = request.files["image"].read()      
+    image = request.files["image"].read()  
+    num_images = 4    
+    num_box_per_image = 10
     if image:
         image  = io.BytesIO(image)
         image = np.array(Image.open(image))
         img_example = image[:, :, ::-1]
         params = default_params('.')
-        boxes = run_objectness(img_example, 10, params)
-        return json.dumps({'boxes': boxes}, cls=NumpyEncoder)
+        boxes = run_objectness(img_example, num_box_per_image, params)
+        # group image id, image id, box id
+        variable_index = np.ones(shape=(4, 3))
+        for i in range(num_images):
+            for j in range(num_box_per_image):
+                variable_index[j, :] = np.array([1, i, j])
+        return json.dumps({'boxes': boxes, 'variable_index': variable_index}, cls=NumpyEncoder)
     return jsonify(image_pth="", safe=False)
 
 
 @activities.route("/ectract_feature", methods=["POST", "GET"], strict_slashes=False)
 def ectract_feature():
-    boxes = request.files["image"].read()      
-    train_data = [cv2.imread(img, cv2.COLOR_BGR2RGB) for img in boxes]
+    boxes = request.form.get("boxes")     
+    img_path = request.form.get("img_path")    
+    mu = 0.5
+    lamda = 0.1
+    k = 10
+    Level = 2
+    train_data = [cv2.imread(img_path, cv2.COLOR_BGR2RGB) for img in boxes]
     x_train = computeSIFT(train_data)
     all_train_desc = []
     for i in range(len(x_train)):
         for j in range(x_train[i].shape[0]):
             all_train_desc.append(x_train[i][j,:])
     all_train_desc = np.array(all_train_desc)
-    k = 10
-    Level = 2
     kmeans = clusterFeatures(all_train_desc, k)
     train_histo = getHistogramSPM(Level, train_data, kmeans, k)
     X = train_histo
@@ -129,29 +141,25 @@ def ectract_feature():
     box_prior = box_prior(train_data)
     L = normalize_laplacian(similarity_matrix)
     nb = len(x_train)
-    k = 2
     vector_one = np.ones(shape=(nb,1))
     dim = X.shape[1]
     I = np.identity(nb)
     central_matrix = I - (1/nb) * np.dot(vector_one, vector_one.T)
-    mu = 0.5
-    lamda = 0.1
     b = np.ones(shape=(nb, nb))
     Identity = np.identity(dim)
-    A = discriminative_optimial(central_matrix, X, nb, Identity, k)
+    A = discriminative_optimial(central_matrix, X, nb, Identity, 2)
     A = L + mu*A
     b = lamda * np.log(box_prior)
-    return jsonify({'A': A, 'b': b}, safe=False)
+    return jsonify({'A': A, 'b': b }, safe=False)
 
 
 @activities.route("/optimize", methods=["POST", "GET"], strict_slashes=False)
 def optimize():
-    annots = request.files["annots"].read()      
-    A = annots['A']
-    b = annots['b']
-    var_index = annots['var_index']
-    edge_index = annots['edge_index']
-  
+    var_index = request.form.get('var_index') 
+    A = request.form.get('A') 
+    b = request.form.get('b') 
+    opts = PARAM()
+
     x_0, S_0, alpha_0, ids = init_images(var_index)
 
     opts.Tmax  = 2000 # max number of iteration

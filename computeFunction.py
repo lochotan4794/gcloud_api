@@ -99,7 +99,6 @@ class SpatialPyramidClassifier:
         self.M = M
         self.num_cells = (4 **(L + 1) - 1) // 3
         self.sp_dim = M * self.num_cells # dim of spatial-pyramid-feature
-
         # self.clusters = KMeans(M) # clusters as vocabulary
         self.clusters_batch = cluster_batch
         self.clusters = MiniBatchKMeans(M, batch_size=self.clusters_batch)

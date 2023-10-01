@@ -60,9 +60,7 @@ class PARAM:
      verbose = property(get_verbose, set_verbose, del_verbose) 
      pureFW = property(get_verbose, set_pureFW, del_pureFW) 
        
-  
-opts = PARAM()
-  
+    
 def find(s):
     # print(s)
     index = []
