@@ -763,7 +763,7 @@ def discretisation(eigen_vec):
 
 def round_box(box):
     xmin, ymin, xmax, ymax, score = box
-    return (int(round(xmin)), int(round(ymin)), int(round(xmax)), int(round(ymax)), score)
+    return (round(float(xmin)), round(float(ymin)), round(float(xmax)), round(float(ymax)), score)
 
 def extract_boxes(run_objectness, M, params, data_dir, imgs):
     box_data = []
@@ -793,10 +793,9 @@ def boxes_data_from_img(boxes, img_id):
 """
 
 def discriminative_optimial(central_matrix, X, nbox, I, k):
-    # print("X shape .{}".format(X.shape))
-    # print("I shape .{}".format(I.shape))
-    # print("CM shape .{}".format(central_matrix.shape))
-    _in_ = X.T @ central_matrix @ X + nbox * k
+    X = np.vstack(X)
+    print("X shape {}".format(X.shape))
+    _in_ = X.T @ central_matrix @ X + nbox * k * I
     I1 = np.identity(X.shape[0])
     _in1_ = I1 - X @ inv(np.matrix(_in_)) @ X.T
     A = (1/nbox) * central_matrix @ _in1_ @ central_matrix 
@@ -868,9 +867,11 @@ def load_dataset(img_dir, annot_file, num_per_class=-1):
 # compute dense SIFT 
 def computeSIFT(data):
     x = []
+    # print(data)
     for i in range(0, len(data)):
         sift = cv2.xfeatures2d.SIFT_create()
         img = data[i]
+        # print(img)
         step_size = 15
         kp = [cv2.KeyPoint(x, y, step_size) for x in range(0, img.shape[0], step_size) for y in range(0, img.shape[1], step_size)]
         dense_feat = sift.compute(img, kp)

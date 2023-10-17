@@ -4,6 +4,10 @@ ENV PYTHONUNBUFFERED True
 
 ENV APP_HOME /app
 
+VOLUME /app/static_files
+
+ENTRYPOINT ["python","main.py", "/app/static_files"]
+
 ENV PORT 5000
 
 WORKDIR $APP_HOME
