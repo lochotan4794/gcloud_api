@@ -6,7 +6,7 @@ ENV APP_HOME /app
 
 VOLUME /app/static_files
 
-ENTRYPOINT ["python","main.py", "/app/static_files"]
+ENTRYPOINT ["python","main.py", "/app/static"]
 
 ENV PORT 5000
 
@@ -17,3 +17,5 @@ COPY . ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 main:app
+
+

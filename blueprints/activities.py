@@ -179,6 +179,7 @@ def fun():
 
 @activities.route("/objectness", methods=["POST", "GET"], strict_slashes=False)
 def objectness():
+    print(request.files)
     image1 = request.files["image1"]
     image2 = request.files["image2"]
     image3 = request.files["image3"]
