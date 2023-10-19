@@ -6,8 +6,6 @@ ENV APP_HOME /app
 
 VOLUME /app/static_files
 
-ENTRYPOINT ["python","main.py", "/app/static"]
-
 ENV PORT 5000
 
 WORKDIR $APP_HOME
