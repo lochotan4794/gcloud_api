@@ -232,7 +232,6 @@ def ectract_feature():
     M = 10
     params = default_params('.')
     params.cues = ['SS']
-    return jsonify({"result":'ok'})
     boxes_data, box_coordinates, raw_data = extract_boxes(M, params, '', imgs)
 
     x_train = [np.uint8(cv2.resize(img,(28,28))*255) for img in boxes_data]
