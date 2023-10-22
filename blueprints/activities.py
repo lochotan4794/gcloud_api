@@ -179,12 +179,13 @@ def fun():
 
 @activities.route("/objectness", methods=["POST", "GET"], strict_slashes=False)
 def objectness():
+    # return '234'
     print(request.files)
     image1 = request.files["image1"]
     image2 = request.files["image2"]
     image3 = request.files["image3"]
     image4 = request.files["image4"]
-    
+
     # im = PIL.Image.open("email.jpg"))
     # width, height = im.size
     # im = im.resize((width//2, height//2))
@@ -193,48 +194,56 @@ def objectness():
     image3 = resize_ratio(image3, 'img3.jpg')
     image4 = resize_ratio(image4, 'img4.jpg')
 
-    images = [image1, image2, image3, image4]
     num_images = 4    
     num_box_per_image = 10
-    boxes = []
-    img_path = ['../img1.jpg', '../img2.jpg', '../img3.jpg', '../img4.jpg']  
-    mu = 0.6
-    lamda = 0.001
+    imgs = ['img1.jpg', 'img2.jpg', 'img3.jpg', 'img4.jpg']  
     M = 10
-     # image  = io.BytesIO(image)
-    # i = 0
-    # for im in images:
-    #     i = i + 1
-    #     img_data = Image.open(im)
-    #     img_data.save('img'+str(i)+'.jpg')
-    #     image = np.array(img_data)
-    #     img_example = image[:, :, ::-1]
-    #     params = default_params('.')
-    #     boxes.append(run_objectness(img_example, num_box_per_image, params))
-    #     # group image id, image id, box id
-    # # boxes = np.vstack(boxes)
+    i = 0
     params = default_params('.')
-    # boxes_data, box_coordinates, raw_data = extract_boxes(M, params, img_path, boxes)
-    result = tuple([1, 2, 3, 4])
+    boxes_data, box_coordinates, raw_data = extract_boxes(M, params, '', imgs)
     variable_index = np.ones(shape=(40, 3))
     for i in range(num_images):
         for j in range(num_box_per_image):
             variable_index[i, :] = np.array([1, i, j])
-    return json.dumps({'boxes': result, 'variable_index': variable_index}, cls=NumpyEncoder)
+
+    boxes_data = [np.uint8(cv2.resize(img,(28,28))*255) for img in boxes_data]
+
+    # raw_data = [np.uint8(cv2.resize(img,(28,28))*255) for img in raw_data]
+    box_prior = get_box_prior(raw_data)
+
+
+    np.save('boxes_data.npy', boxes_data)
+
+    with open('box_coordinates.npy', 'wb') as f:
+        np.save(f, np.array(box_coordinates))
+
+    with open('box_prior.npy', 'wb') as f:
+        np.save(f, np.array(box_prior))
+
+    return json.dumps({'variable_index': variable_index}, cls=NumpyEncoder)
 
 
 @activities.route("/getFeatures", methods=["POST", "GET"], strict_slashes=False)
 def ectract_feature():
     # boxes = split_array(request.form.get("boxes"))
-    imgs = ['img1.jpg', 'img2.jpg', 'img3.jpg', 'img4.jpg']  
+    # imgs = ['img1.jpg', 'img2.jpg', 'img3.jpg', 'img4.jpg']  
     mu = 0.6
     lamda = 0.001
     M = 10
     params = default_params('.')
     params.cues = ['SS']
-    boxes_data, box_coordinates, raw_data = extract_boxes(M, params, '', imgs)
+    # boxes_data, box_coordinates, raw_data = extract_boxes(M, params, '', imgs)
+    with open('boxes_data.npy', 'rb') as f:
+        boxes_data = np.load(f)
 
-    x_train = [np.uint8(cv2.resize(img,(28,28))*255) for img in boxes_data]
+    # with open('box_coordinates.npy', 'rb') as f:
+    #     box_coordinates = np.load(f)
+
+    with open('box_prior.npy', 'rb') as f:
+        box_prior = np.load(f)
+
+    # x_train = [np.uint8(cv2.resize(img,(28,28))*255) for img in boxes_data]
+    x_train = boxes_data
     x_train = np.asarray(x_train)
 
     VOC_SIZE = 1000
@@ -242,6 +251,7 @@ def ectract_feature():
     DSIFT_STEP_SIZE = 4
 
     x_train_feature = [extract_DenseSift_descriptors(img) for img in x_train]
+
     x_train_kp, x_train_des = zip(*x_train_feature)
 
     codebook = build_codebook(x_train_des, VOC_SIZE)
@@ -258,7 +268,7 @@ def ectract_feature():
     S = cosine_similarity(x_train)
     similarity_matrix = _sparse_sim_matrix(S, M, nb)
 
-    box_prior = get_box_prior(raw_data)
+    # box_prior = get_box_prior(raw_data)
 
     if box_prior.ndim == 1:
         box_prior = np.expand_dims(box_prior, 1)
